@@ -3,19 +3,19 @@
 # Akana Automated Software Deployment
 
 ## Installer Script
-The installer script is used manily to install the product.  At the time of installation, the installer script can create (`-c`) containers by invoking the container script below.
+The installer script is used mainly to install the product.  At the time of installation, the installer script can create (`-c`) containers by invoking the container script below.
 
 To run installer:
 
 * Download and copy the appropriate files to intended server (`/opt/akana_sw/stage/install`)
 * cd \<extracted location\>/install
-* Extract `ps-automation.\<version\>.zip` somewhere (`unzip ps-automation.\<version\>.zip`)
+* Extract `automation_v<version>_<build>.zip` somewhere (`unzip automation_v<version>_<build>.zip`)
 * vi (or favorite editor) `properties/installer.properties`
 * Update as needed
     * resources
     * features
 * add appropriate environment and container property files to properties directory
-* run `./installer.py -i -s -c > createContainers.log`
+* run `./installer.py -i -s -c | tee createContainers.log`
 
 All valid options are:
 
@@ -50,6 +50,7 @@ All valid options are:
 * `--administrator` Administrator user for the console
 * `--password` Password for the administrator user
 * `--ssldebug` Sets SSL debug on when the Jython scripts are called.
+* `--recipe` Main Recipe to be ran.
 
 To delete the container:
 * typical usage - `./installer.py -d --key <container key> --host <address to the PM server> --administrator <administrator user> --password <user password> --installpath <installation path>`
@@ -92,6 +93,7 @@ All valid options are:
 * `--custompolicies` Custom Policies to deploy to the deploy directory.
 * `--environmentproperties` Include the name of the environment property file, if the default needs to be overridden.
 * `--ssldebug` Sets SSL debug on when the Jython scripts are called.
+* `--recipe` Main Recipe to be ran.
 
 ### Logging
 The Database and Container creation takes advantage of using a python logger [Python Logging](https://docs.python.org/2/library/logging.html).  
@@ -107,6 +109,8 @@ The databaseLogger is defaulted to CRITICAL and the containerLogger is defaulted
 
 For instance, if you were creating a new database and did not want to see all of the statements but wanted to see informational messages, you would change the databaseLogger level to INFO.  But, if there is an issue, you could set
 this level to DEBUG and see all of the SQL statements as they are being ran.
+
+`containerlog` has an extra setting of `TRACE`.  This will run the Recipe Deployment Automation in debug mode.  The is a very verbose setting and should be used with care.
 
 ### Container Monitoring
 
@@ -219,7 +223,13 @@ to `true`.
 if installing multiple feature packs, the features properties would look like:
 
 ```properties
-    features=akana-platform-8.1.39.zip,akana-pm-8.0.115.zip,akana-apiportal-8.0.0.291.zip,com.akana.devservices_8.0.0.zip,com.akana.integration.services_8.0.189684.zip,com.akana.activity.freemarker_8.0.0.zip,com.akana.activity.headers_8.0.0.zip,com.akana.activity.normalize_8.0.0.zip,com.soa.security.provider.siteminder_8.0.189684.zip,PolicyManagerForDataPower_8.0.0.zip
+    features=akana-platform-linux-jre-2018.0.0.19.zip\
+        ,akana-api-platform-2018.0.0.396.zip\
+        ,akana-platform-update-cumulative-2018.0.1.zip\
+        ,akana-api-platform-update-cumulative-2018.0.2.zip\
+        ,com.akana.option.packs_2018.0.0.24.zip\
+        ,com.soa.saml2.websso_2018.0.0.24.zip\
+        ,com.soa.security.provider.siteminder_2018.0.0.24.zip
 ```
 
 ### Environment Property File
@@ -251,18 +261,6 @@ Database configuration works in the following manner:
 * database.configure=false -- Database process is bypassed
 
 Database scripts can be completely script.  This will allow the configuration of the database configuration file, but it will ignore any upgrade scripts that are found.  If this feature is desired, add `database.run.dbscripts=false` into the environment.properties file.  This is an optional property and is not required to exist in the property file.  This will default to true if it does not exist.
-
-The following schema's can be installed into a database:
-
-* pm
-* cm
-* oauth
-* laas
-* upgrade52
-* pmdp
-* wcf
-* ims
-* websso
 
 Specify the configuration values for this database
 
@@ -371,19 +369,20 @@ property when the connection needs to be secured.
     # Should the scripts run any needed dbscripts
     database.run.dbscripts=true
     # Check the required schemas
-    database.pm=true
-    database.cm=false
-    database.oauth=false
-    database.laas=false
-    database.upgrade52=false
-    database.pmdp=false
-    database.wcf=false
-    database.ims=false
-    database.websso=false
-    database.lm=false
-    database.coordinator=false
-    # database.custom is used for any custom schema changes.  This is a comma separated field of all custom schema's  `database.custom=ps.common.schema`
-    database.custom=
+    # deprecated in 2018
+    #   database.pm=true
+    #   database.cm=false
+    #   database.oauth=false
+    #   database.laas=false
+    #   database.upgrade52=false
+    #   database.pmdp=false
+    #   database.wcf=false
+    #   database.ims=false
+    #   database.websso=false
+    #   database.lm=false
+    #   database.coordinator=false
+    #   # database.custom is used for any custom schema changes.  This is a comma separated field of all custom schema's  `database.custom=ps.common.schema`
+    #   database.custom=
     #  	Specify the configuration values for this database
     #    	key       |restrict | description         
     #   -------------+---------+--------------------------------------------------
@@ -415,7 +414,7 @@ property when the connection needs to be secured.
     database.max.pool.size=30
     database.min.pool.size=3
     database.max.wait=30000
-    database.jar=
+    database.jar=file:
     # mssql/oracle specific, only populate for mssql or oracle
     database.instance.name=
     # db2 specific, only populate for db2
@@ -476,6 +475,8 @@ property when the connection needs to be secured.
 
 ```
 
+
+
 ### Container Property Files
 A uniquely named container file should be provided for every container that needs to be built and configured for a
 specific environment.  So, if a PM and ND nodes are needed an a single host, it would be required for 2 uniquely named
@@ -483,7 +484,7 @@ container property files.
 
 For a secured container, include the secured flag as true.  Two different JAVA keystores are required for a secure container.  The container keystore `container.secure.keystore` contains the container private key, the second keystore `container.secure.trusted.keystore` contains the trusted certificates for all the containers and listeners in the environment.  If the container identity certificate has a different password then the container keystore, provide the property `container.secure.alias.password`.  At the same time, the `com.soa.security` category will be appropriately updated and the crl flag will be set to false in the `com.soa.crl` category.
 
-Only container required fields are needed in a properties file.  The automation allows property fields to be omitted. If a property filename has "default" in it, the property file will be skipped by automation.  
+Only container required fields are needed in a properties file.  The automation allows property fields to be omitted.  
 The following lists what is required based off of the container type:
 
 + All Containers
@@ -564,7 +565,7 @@ When deploying a standalone CM container that has admin access, it is recommende
     pm.context.path=
 ```
 
-Automation supports building route files.  For more information on route files see https://library.roguewave.com/display/MAIN/Routing+Network+Director+through+the+F5.  
+Automation supports building route files.  For more information on route files see https://support.soa.com/support/index.php?_m=knowledgebase&_a=viewarticle&kbarticleid=607.  
 In the container property file, all route files are defined in a the property `route.definitions=`.  An example of an ND routing back through a clustered PM.  The property is configured like `filename;pattern;url`, each route file definition would be seperated by a comma.  Route files can also be added with providing the --deployFiles command switch.
 
 Managing cluster support.  Automation will automatically register an ND container into a Cluster that is created in PM.  If a cluster name is provided and the cluster doesn't exist, the cluster will first be created.  Once the cluster is
@@ -915,30 +916,9 @@ which supports multiple tenants and themes`.
 ```
 
 #### ElasticSearch Configuration
-ElasticSearch has three configuration settings: `embeddedConfig`, `transportClientConfig`, and `clientOnlyConfig`.
-Typical non-production environment will use `embeddedConfig` and `transportClientConfig` is needed for production environment.
+ElasticSearch has three configuration settings: `restConfig` and `transportClientConfig`.
 
-Sample `embeddedConfig`:
-```properties
-elastic.search.configuration = { \
-	"shards" : 2, \
-	"replicas" : 1, \
-	"embeddedConfig" : { \
-		"clusterName" : "MyESCluster", \
-		"minimumMasterNodes" : 2, \
-		"multicastEnabled" : False, \
-		"nodeName" : "MyESCluster_node_1", \
-		"indexLocation" : "/var/akana/index", \
-		"networkBindHost" : "0.0.0.0", \
-		"networkPublishHost" : "localhost", \
-		"transportPort" : 9300, \
-		"httpPort" : 9200, \
-		"httpEligible" : False, \
-		"masterEligible" : True, \
-		"isDataNode" : True \
-	} \
-}
-```
+`restConfig` is the recommended configuration using 2018 and beyond.
 
 Sample `transportClientConfig`:
 ```properties
@@ -947,24 +927,18 @@ elastic.search.configuration = { \
 	"replicas" : 1, \
 	"transportClientConfig" : { \
 		"clusterName" : "MyESCluster", \
-		"esServerUrl" : "escluster1" \
+		"esServerUrl" : "http://escluster1"
 	} \
 }
 ```
 
-Sample `clientOnlyConfig`:
+Sample `restConfig`:
 ```properties
 elastic.search.configuration = { \
 	"shards" : 2, \
 	"replicas" : 1, \
-	"clientOnlyConfig" : { \
-		"clusterName" : "MyESCluster", \
-		"masterHostUrl" : "masterESnode", \
-		"multicastEnabled" : False, \
-		"nodeName" : "MyESCluster_node_1", \
-		"networkBindHost" : "0.0.0.0", \
-		"networkPublishHost" : "localhost", \
-		"transportPort" : 9300 \
+	"restConfig" : { \
+		"esServerUrl" : "http://masterESnode", \
 	} \
 }
 ```
@@ -1508,6 +1482,7 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     #CommonProperties
     container.name=pm
     container.key=
+    recipe.name=
     # this is used for the hostname unless the scripts pass in '--hostname'
     container.host=0.0.0.0
     container.port=9900
@@ -1531,6 +1506,17 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     container.listener.pki.alias.password=
     container.secure=false
     # The certificates that will be used for container identity, if the default ones are not acceptable
+    # Generate Container Identity
+    generate.identity.common.name=
+    generate.identity.org.unit=
+    generate.identity.org.name=
+    generate.identity.state.name=
+    generate.identity.country=
+    generate.identity.local.name=
+    generate.identity.key.length=
+    generate.identity.expiration.date=
+    # Import Container Identity
+    import.identity.keystore.type=
     container.secure.keystore=
     container.secure.storepass=
     container.secure.alias=
@@ -1543,7 +1529,7 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     # Key that is used during verification when calling remote APIs
     certificate.verification.alias=
     certificate.verification.alias.password=
-    # com.soa.container.metadata.service
+    
     secure.metadata.service=false
     
     # agent path for dynatrace or appdynamics
@@ -1572,10 +1558,9 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     community.manager.oauth.provider=false
     community.manager.scheduled.jobs=false
     oauth.provider=false
-    ## 8.X features
+    ## 8.0 features
     elastic.search=false
     grant.provisioning.ui=false
-    # True sets:  com.soa.oauth.provider.server.config.datasource=NOSQL (i.e. Mongo)
     use.oauth.grants=true
     
     ## Miscellaneous
@@ -1606,7 +1591,6 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     kerberos.impersonation=false
     community.manager.laas=false
     community.manager.laas.schedule.jobs=false
-    lifecycle.manager.api.platform.extension=false
     ping.federate.integration=false
     mongo.db=false
     ## 8.2 features
@@ -1675,7 +1659,7 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     pm.master.password=
     # if the PM admin console is running on a different port, than wsmex please provide the address to the PM admin console.  'http://<hostname>:<port>
     pm.admin.console=
-    # if the PM admin access is different from this container (admin console user), set the proper values here
+    # if the PM admin access is different from this container, set the proper values here
     pm.admin.user=
     pm.admin.password=
     # If Basic Auth has been disabled for the configjob, set configjob.secured to false
@@ -1737,7 +1721,7 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     ncsa.access.log.filename=${product.home.dir}/instances/${container.name}/log/jetty_access_yyyy_mm_dd.log
     ncsa.access.log.retainDays=30
     ncsa.access.log.extended=false
-
+    
     # com.soa.promotion
     remote.promotor.address=
     
@@ -1757,7 +1741,7 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     compass.engine.optimizer.schedule.period=600
     
     # com.soa.rollup.configuration.cfg
-    monitoring.rollup.configuration.countersForEachRun=0
+    monitoring.rollup.configuration.countersForEachRun= 0
     metric.evaluator.timeZoneMappings=UTC:GMT,America/Los_Angeles:PST
     statistic.dao.timeZoneMappings=UTC:GMT,America/Los_Angeles:PST
     monitoring.rollup.configuration.dailyRollupTimeZones=GMT
@@ -1791,6 +1775,17 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     elastic.client.enableSSL=false
     elastic.client.keystorePassword=
     elastic.client.keystorePath=
+    # Added for ES 6.3
+    elastic.client.certificateAuthorities=
+    elastic.client.keyPassphrase=
+    elastic.client.keyPassword=
+    elastic.client.keystoreType=
+    elastic.client.sslCertificate=
+    elastic.client.sslHostNameVerifierMode=
+    elastic.client.sslKey=
+    elastic.client.transportSSLVerificationMode=
+    elastic.client.truststorePassword=
+    elastic.client.truststorePath=
     
     # com.soa.http.client.core.cfg 'SSLv3,TLSv1,TLSv1.1,TLSv1.2'
     https.socket.factory.enabledProtocols=
@@ -1804,16 +1799,20 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     atmosphere.console.config.userDefinedScriptVersion=
     atmosphere.default.policies=
     
+    # com.soa.crl
+    com.soa.crl.enabled=true
+    
     # com.soa.log
     log4j.appender=
     log4j.location=
     
-    # ccom.soa.scheduler.quartz
+    # com.soa.scheduler.quartz
     org.quartz.scheduler.enabled=true
     
     # com.soa.console
     email.sender=
     number.of.alerts.to.dispatch.in.one.run=200
+    QuickSearch.enabled=false
     
     # com.soa.policy.handler.audit
     audit.maxContentSize=10000000
@@ -1827,7 +1826,7 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     #TenantProperties
     tenant.create=false
     #portal.definition={
-    #	"contextRoot": "/devportal", \
+    #	"contextRoot": "/devporal", \
     #  	"userRolesDenied": "", \
     #  	"tenants": [{\
     #  		"contactEmailAddress": "no-reply@open", \
@@ -1842,7 +1841,8 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     #  		"consoleAddress": "https://localhost:19910/devportal", \
     #  		"adminEmail": "admin@open", \
     #  		"adminPassword": "password", \
-    #  		"loadDefaultContent": false\
+    #  		"loadDefaultContent": false, \
+    #       "esIndexName": "
     #  	}] \
     #}
     portal.definition=
@@ -1876,6 +1876,10 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     #		"esServerUrl" : "http://escluster1"
     #	}
     #
+    # REST config
+    #
+    
+    #
     # Client Only config
     #
     #	"clientOnlyConfig" : { \
@@ -1887,10 +1891,19 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     #		"networkPublishHost" : "localhost", \
     #		"transportPort" : 9300, \
     #	}
-    elastic.search.configuration=
+    elastic.search.configuration={\
+    "restConfig" : { \
+    	"esServerUrl" : "http://escluster1"\
+    }
     
     # com.soa.console
     pmcontext.path=
+    
+    # com.soa.wssecurity
+    validate.algorithms=false
+    
+    # com.soa.wsdl
+    wsdl.storage.manager.maxEntries=-1
     
     #HardeningProperties
     # Hardening properties are set to recommended values.  Change if desired.  For details review: http://docs.akana.com/sp/platform-hardening_2.0.html
@@ -1900,7 +1913,7 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     ## http.client.params.cookiePolicy
     harden.ignoreCookies=ignoreCookies
     
-    # com.soa.platform.jetty
+    # com.soa.transport.jetty
     ## session.manager.factory.secureCookies
     harden.secureCookies=true
     ## http.incoming.transport.config.enabledProtocols
@@ -2059,7 +2072,7 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     com.soa.keystore.external.location=
     com.soa.keystore.external.password=
     com.soa.keystore.external.providerName=
-
+    
     # Custom Health Admin Panels to be added
     custom.health.panels=
     #custom.health.panels={ \
@@ -2081,6 +2094,7 @@ If it was required to add SYSLOG into the `com.soa.log` category, the property w
     #		}] \
     #	}] \
     #}
+
 ```
 
 ## Copyright
