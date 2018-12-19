@@ -1,5 +1,37 @@
 # Changes
 
+v2018.0.3
+
+* Moved the OAuth recipe to the product
+* Fixed an exception when tenant was an empty JSON node.
+* Added the following to a listener configuration.  If they don't exist, they will be defaulted.
+```properties
+'provisionInitialDelay':<true/false>,
+'provisionPoll':2000,
+```
+* Added secure PM HSM recipe
+
+---
+
+v2018.0.2
+
+* Added support for recipe based automation
+* Added the ability to have the slf jar file automatically moved into the /script library
+* Added a `TRACE` setting for the containerlog.  This will set recipes in a `debug` mode.  Use this with caution, it's very verbose.
+* Added OAuth Container recipes to be able to deploy a standalone OAuth Container.
+* Support for running multiple containers with a single command.  Remove `--recipe` from the command line and add the following to the container properties file
+```properties
+recipe.name=<absolute path to the recipe file>
+```
+* Added support for setting crl enabled
+```properties
+# com.soa.crl
+com.soa.crl.enabled=true
+```
+
+---
+
+
 v8.4.27
 
 * Added a fix to check if the listeners alias password is encoded.  If it is, it needs to be decrypted, prior to pushing the cert to the PM workbench.
@@ -20,6 +52,8 @@ com.akana.oauth.client.server.config.cacheInvalidateTime=60
 
 * Added a fix to properly update the admin URL
 
+---
+
 v8.4.24
 
 * Changed the cluster nodes to not replace all nodes.
@@ -30,7 +64,7 @@ v8.4.24
 
 v8.4.23
 
-* Fixed uploading outbounding certificates
+* Fixed uploading outbounding certificates 
 
 ---
 
